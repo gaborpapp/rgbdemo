@@ -24,6 +24,7 @@
 #include "GuiController.h"
 
 #include <ntk/gui/screen_grabber.h>
+#include <ntk/gui/image_widget.h>
 #include <ntk/mesh/rgbd_modeler.h>
 
 #include <ntk/camera/rgbd_grabber.h>
@@ -50,6 +51,15 @@ class RawImagesWindow;
 class GuiController : public ntk::AsyncEventListener
 {
     Q_OBJECT
+
+public:
+    struct ObjectData
+    {
+        ntk::Mesh mesh;
+        ntk::ImageWidget::TextData text;
+        std::vector<cv::Point2i> pixels;
+        cv::Rect bbox;
+    };
 
 public:
     GuiController(ntk::RGBDGrabber& producer, ntk::RGBDProcessor& processor);
@@ -84,8 +94,11 @@ public:
 
     ModelAcquisitionWindow* modelAcquisitionWindow() { return m_model_window; }
 
+    void acquireNewModels();
     void notifyNewModel() { m_new_model = true; }
     void newModelCallback();
+    void saveModels();
+    void resetModels();
 
 public:
     void toggleShowPlane(bool b) { m_show_plane = b; }
@@ -133,6 +146,7 @@ protected:
     bool m_show_plane;
     bool m_find_objects;
     bool m_new_model;
+    std::vector<ObjectData> m_objects;
 };
 
 
