@@ -30,10 +30,10 @@
 #include <ntk/camera/file_grabber.h>
 #include <ntk/camera/rgbd_frame_recorder.h>
 #ifdef NESTK_USE_FREENECT
-#include <ntk/camera/kinect_grabber.h>
+#include <ntk/camera/freenect_grabber.h>
 #endif
 #ifdef NESTK_USE_OPENNI
-# include <ntk/camera/nite_rgbd_grabber.h>
+# include <ntk/camera/openni_grabber.h>
 #endif
 #include "GuiController.h"
 #include "PeopleTracker.h"
@@ -46,6 +46,7 @@ using namespace cv;
 
 namespace opt
 {
+ntk::arg<int> debug_level("--debug", "Debug level", 1);
 ntk::arg<const char*> dir_prefix("--prefix", "Directory prefix for output", "grab1");
 ntk::arg<const char*> calibration_file("--calibration", "Calibration file (yml)", 0);
 ntk::arg<bool> freenect("--freenect", "Force freenect driver", 0);
@@ -60,7 +61,7 @@ int main (int argc, char** argv)
 {
     arg_base::set_help_option("-h");
     arg_parse(argc, argv);
-    ntk_debug_level = 1;
+    ntk_debug_level = opt::debug_level();
     cv::setBreakOnError(true);
 
     QApplication::setGraphicsSystem("raster");
@@ -72,6 +73,10 @@ int main (int argc, char** argv)
         fake_dir = opt::directory();
 
     ntk::RGBDProcessor* processor = 0;
+
+#ifdef NESTK_USE_OPENNI
+    OpenniDriver* ni_driver = 0;
+#endif
 
     RGBDGrabber* grabber = 0;
     bool use_openni = !opt::freenect();
@@ -91,7 +96,8 @@ int main (int argc, char** argv)
         // Config dir is supposed to be next to the binaries.
         QDir prev = QDir::current();
         QDir::setCurrent(QApplication::applicationDirPath());
-        NiteRGBDGrabber* k_grabber = new NiteRGBDGrabber();
+        if (!ni_driver) ni_driver = new OpenniDriver();
+        OpenniGrabber* k_grabber = new OpenniGrabber(*ni_driver);
         k_grabber->setTrackUsers(false);
         if (opt::high_resolution())
             k_grabber->setHighRgbResolution(true);
@@ -103,7 +109,7 @@ int main (int argc, char** argv)
 #ifdef NESTK_USE_FREENECT
     else
     {
-        KinectGrabber* k_grabber = new KinectGrabber();
+        FreenectGrabber* k_grabber = new FreenectGrabber();
         k_grabber->initialize();
         k_grabber->setIRMode(false);
         grabber = k_grabber;
@@ -114,11 +120,11 @@ int main (int argc, char** argv)
 
     if (use_openni)
     {
-        processor = new ntk::NiteProcessor();
+        processor = new ntk::OpenniRGBDProcessor();
     }
     else
     {
-        processor = new ntk::KinectProcessor();
+        processor = new ntk::FreenectRGBDProcessor();
     }
     processor->setFilterFlag(RGBDProcessor::FilterEdges, true);
 

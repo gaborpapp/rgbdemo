@@ -1,4 +1,21 @@
-// <nicolas.burrus@uc3m.es>
+/**
+ * This file is part of the rgbdemo project.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Author: Nicolas Burrus <nicolas@burrus.name>, (C) 2010, 2011
+ */
 
 #ifndef NESTK_USE_OPENNI
 # error "OpenNI support is required. Enable NESTK_USE_OPENNI."
@@ -32,6 +49,7 @@ using namespace cv;
 
 namespace opt
 {
+ntk::arg<int> debug_level("--debug", "Debug level", 1);
 ntk::arg<const char*> dir_prefix("--prefix", "Directory prefix for output", "grab");
 ntk::arg<const char*> calibration_file1("--calibration1", "Calibration file for first Kinect (yml)", 0);
 ntk::arg<const char*> calibration_file2("--calibration2", "Calibration file for second Kinect (yml)", 0);
@@ -50,14 +68,14 @@ ntk::arg<const char*> directory4("--directory4", "Fake mode, use given still dir
 
 ntk::arg<bool> sync("--sync", "Synchronization mode", 0);
 ntk::arg<bool> use_highres("--highres", "High resolution mode (Nite only)", 0);
-ntk::arg<int> num_devices("--numdevices", "Number of connected Kinects", 2);
+ntk::arg<int> num_devices("--numdevices", "Number of connected Kinects (-1 is all)", -1);
 }
 
 int main (int argc, char** argv)
 {
     arg_base::set_help_option("-h");
     arg_parse(argc, argv);
-    ntk_debug_level = 1;
+    ntk_debug_level = opt::debug_level();
     cv::setBreakOnError(true);
 
     std::vector<const char*> calibration_files(4);
@@ -83,6 +101,15 @@ int main (int argc, char** argv)
     ntk::RGBDProcessor* rgbd_processor = new OpenniRGBDProcessor();
     rgbd_processor->setFilterFlag(RGBDProcessor::ComputeMapping, true);
 
+    OpenniDriver ni_driver;
+    ntk_ensure(ni_driver.numDevices() >= 1, "No devices connected!");
+
+    if (opt::num_devices() < 0)
+        opt::num_devices.value_ = ni_driver.numDevices();
+
+    ntk_ensure(opt::num_devices() <= ni_driver.numDevices(),
+               format("Only %d devices detected!", ni_driver.numDevices()).c_str());
+
     MultipleGrabber* grabber = new MultipleGrabber();
     for (int i = 0; i < opt::num_devices(); ++i)
     {
@@ -97,7 +124,7 @@ int main (int argc, char** argv)
         }
         else
         {
-            OpenniGrabber* ni_grabber = new OpenniGrabber(i);
+            OpenniGrabber* ni_grabber = new OpenniGrabber(ni_driver, i);
             if (opt::use_highres())
             {
                 ni_grabber->setHighRgbResolution(true);
